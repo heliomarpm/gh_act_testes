@@ -18,10 +18,10 @@ jobs:
         with:
           node-version: '16'
 
+          #git fetch origin main
       - name: Check if package.json changed
         id: package-json-changed
         run: |
-          git fetch origin main
           if git diff --name-only HEAD^ HEAD | grep -q 'package.json'; then
             echo "package.json changed"
             echo "changed=true" >> $GITHUB_OUTPUT            
