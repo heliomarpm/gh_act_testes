@@ -13,20 +13,20 @@ jobs:
         uses: actions/checkout@v4.1.6
         with:
           fetch-depth: 2  # Traz pelo menos 2 commits para que HEAD^ esteja disponível
- 
+
 
       - name: Setup Node.js
         uses: actions/setup-node@v4.0.2
         with:
           node-version: '16'
 
-          #git fetch origin main
       - name: Check if package.json changed
         id: package-json-changed
         run: |
+          #git fetch origin main
           if git diff --name-only HEAD^ HEAD | grep -q 'package.json'; then
             echo "package.json changed"
-            echo "changed=true" >> $GITHUB_OUTPUT            
+            echo "changed=true" >> $GITHUB_OUTPUT
           else
             echo "package.json did not change"
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -35,7 +35,7 @@ jobs:
       - name: Get current package version
         if: steps.package-json-changed.outputs.changed == 'true'
         id: pkg
-        run: echo "version=$(jq -r .version < package.json)" >> $GITHUB_OUTPUT
+        run: echo "version=$(jq -r .version < package.json)" >> $GITHUB_ENV
 
       - name: Get previous version
         if: steps.package-json-changed.outputs.changed == 'true'
@@ -44,20 +44,21 @@ jobs:
           git fetch --tags
           PREV_TAG=$(git tag --list --sort=-v:refname | head -n 1)
           if [ -z "$PREV_TAG" ]; then
-            echo "version=0.0.0" >> $GITHUB_OUTPUT
+            echo "prev_version=0.0.0" >> $GITHUB_ENV
           else
-            echo "version=$PREV_TAG" >> $GITHUB_OUTPUT
+            echo "prev_version=${PREV_TAG#v}" >> $GITHUB_ENV
           fi
 
       - name: Compare versions and create tag
         if: steps.package-json-changed.outputs.changed == 'true'
         run: |
-          NEW_VERSION=$(jq -r .version < package.json)
-          if [ "$NEW_VERSION" != "$PREV_VER" ]; then
+          new_version=$(jq -r .version < package.json)
+          if [ "$new_version" != "$prev_version" ]; then
             git config --global user.name 'github-actions[bot]'
             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-            git tag "v$NEW_VERSION"
-            git push origin "v$NEW_VERSION"
+            git tag "v$new_version"
+            git push origin "v$new_version"
           fi
         env:
-          PREV_VER: ${{ steps.prev_ver.outputs.version }}
+          version: ${{ env.version }}
+          prev_version: ${{ env.prev_version }}
