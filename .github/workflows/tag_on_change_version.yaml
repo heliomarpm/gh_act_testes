@@ -1,0 +1,61 @@
+name: Tag on version change
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  tag-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4.1.6
+  
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.0.2
+        with:
+          node-version: '16'
+
+      - name: Check if package.json changed
+        id: package-json-changed
+        run: |
+          git fetch origin main
+          if git diff --name-only HEAD^ HEAD | grep -q 'package.json'; then
+            echo "package.json changed"
+            echo "::set-output name=changed::true"
+          else
+            echo "package.json did not change"
+            echo "::set-output name=changed::false"
+          fi
+
+      - name: Get current package version
+        if: steps.package-json-changed.outputs.changed == 'true'
+        id: pkg
+        run: echo "::set-output name=version::$(jq -r .version < package.json)"
+
+      - name: Get previous version
+        if: steps.package-json-changed.outputs.changed == 'true'
+        id: prev_ver
+        run: |
+          git fetch --tags
+          PREV_TAG=$(git tag --list --sort=-v:refname | head -n 1)
+          if [ -z "$PREV_TAG" ]; then
+            echo "::set-output name=version::0.0.0"
+          else
+            echo "::set-output name=version::$PREV_TAG"
+          fi
+
+      - name: Compare versions and create tag
+        if: steps.package-json-changed.outputs.changed == 'true'
+        run: |
+          NEW_VERSION=$(jq -r .version < package.json)
+          if [ "$NEW_VERSION" != "$PREV_VER" ]; then
+            git config --global user.name 'github-actions[bot]'
+            git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+            git tag "v$NEW_VERSION"
+            git push origin "v$NEW_VERSION"
+          fi
+        env:
+          PREV_VER: ${{ steps.prev_ver.outputs.version }}
